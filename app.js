@@ -53,7 +53,7 @@ async function query(data) {
 
   const result = await response.json()
   console.log("Stack Result: ", result)
-  return result
+  return result["out-0"]
 }
 
 async function sendMessage(to, message) {
