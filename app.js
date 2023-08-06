@@ -4,31 +4,40 @@ const port = process.env.PORT || 3001
 
 app.use(express.json())
 
+// GET endpoint for subscription verification
 app.get("/", (req, res) => {
-  if (
-    req.query["hub.mode"] == "subscribe" &&
-    req.query["hub.verify_token"] == process.env.VERIFY_TOKEN
-  ) {
+  const { "hub.mode": mode, "hub.verify_token": verifyToken } = req.query
+
+  // Verify the subscription using the verify token from the environment
+  if (mode === "subscribe" && verifyToken === process.env.VERIFY_TOKEN) {
     res.send(req.query["hub.challenge"])
   } else {
-    res.sendStatus(400)
+    res.sendStatus(403) // Return 403 Forbidden for invalid subscription verification
   }
 })
 
+// POST endpoint to process incoming messages
 app.post("/", async function (req, res) {
-  console.log("Request body:", req.body)
+  try {
+    const body = req.body
+    console.log("Request body:", body)
 
-  const message = req.body.entry[0].changes[0].value.messages[0].text.body
-  const from = req.body.entry[0].changes[0].value.messages[0].from
+    const messages = extractTextMessagesFromBody(body)
 
-  // call stack API with body
-  const response = await query({
-    "in-0": `${message}`,
-  })
-  // send to WhatsApp
-  await sendMessage(from, response)
+    for (const message of messages) {
+      const text = message.text.body
+      const sender = message.from
 
-  res.sendStatus(200)
+      const response = await queryStackFlow({ "in-0": text })
+      // Send the response from the Stack Flow to WhatsApp
+      await sendWhatsAppMessage(sender, response)
+    }
+
+    res.sendStatus(200) // Return 200 OK for successful processing
+  } catch (error) {
+    console.error("Error:", error)
+    res.sendStatus(500) // Return 500 Internal Server Error for any processing errors
+  }
 })
 
 const server = app.listen(port, () =>
@@ -38,7 +47,7 @@ const server = app.listen(port, () =>
 server.keepAliveTimeout = 120 * 1000
 server.headersTimeout = 120 * 1000
 
-async function query(data) {
+async function queryStackFlow(data) {
   const response = await fetch(
     "https://www.stack-inference.com/run_deployed_flow?flow_id=64cebfa6b70f18a5120529ee&org=8c70046d-ca37-4ea1-a615-f4e81a0099c6",
     {
@@ -52,11 +61,11 @@ async function query(data) {
   )
 
   const result = await response.json()
-  console.log("Stack Result: ", result)
+  console.log("Stack Result:", result)
   return result["out-0"]
 }
 
-async function sendMessage(to, message) {
+async function sendWhatsAppMessage(recipient, message) {
   const response = await fetch(
     "https://graph.facebook.com/v17.0/116747901506573/messages",
     {
@@ -68,7 +77,7 @@ async function sendMessage(to, message) {
       body: JSON.stringify({
         messaging_product: "whatsapp",
         recipient_type: "individual",
-        to: to,
+        to: recipient,
         type: "text",
         text: {
           // the text object
@@ -78,7 +87,27 @@ async function sendMessage(to, message) {
       }),
     }
   )
+
   const result = await response.json()
-  console.log("WhatsApp Result: ", result)
+  console.log("WhatsApp Result:", result)
   return result
+}
+
+function extractTextMessagesFromBody(payload) {
+  const valueObject = payload.entry[0]?.changes[0]?.value
+
+  if (!valueObject || !valueObject.messages) {
+    return [] // Return an empty array if there are no messages in the payload
+  }
+
+  const messagesArray = valueObject.messages
+  const textMessages = []
+
+  messagesArray.forEach((message) => {
+    if (message.type === "text") {
+      textMessages.push(message)
+    }
+  })
+
+  return textMessages
 }
