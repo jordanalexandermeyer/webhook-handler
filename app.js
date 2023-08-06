@@ -20,7 +20,7 @@ app.get("/", (req, res) => {
 app.post("/", async function (req, res) {
   try {
     const body = req.body
-    console.log("Request body:", body)
+    console.log("Request body:", JSON.stringify(body))
 
     const messages = extractTextMessagesFromBody(body)
 
@@ -61,7 +61,7 @@ async function queryStackFlow(data) {
   )
 
   const result = await response.json()
-  console.log("Stack Result:", result)
+  console.log("Stack Result:", JSON.stringify(result))
   return result["out-0"]
 }
 
@@ -89,7 +89,7 @@ async function sendWhatsAppMessage(recipient, message) {
   )
 
   const result = await response.json()
-  console.log("WhatsApp Result:", result)
+  console.log("WhatsApp Result:", JSON.stringify(result))
   return result
 }
 
@@ -106,6 +106,9 @@ function extractTextMessagesFromBody(payload) {
   messagesArray.forEach((message) => {
     if (message.type === "text") {
       textMessages.push(message)
+      console.log("Processing message:", JSON.stringify(message))
+    } else {
+      console.log("Skipping message:", message)
     }
   })
 
