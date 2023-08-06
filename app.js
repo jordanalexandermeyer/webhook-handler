@@ -4,7 +4,7 @@ const port = process.env.PORT || 3001
 
 app.use(express.json())
 
-const seenMessages = Set()
+const seenMessages = new Set()
 
 // GET endpoint for subscription verification
 app.get("/", (req, res) => {
