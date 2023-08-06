@@ -4,6 +4,8 @@ const port = process.env.PORT || 3001
 
 app.use(express.json())
 
+const seenMessages = Set()
+
 // GET endpoint for subscription verification
 app.get("/", (req, res) => {
   const { "hub.mode": mode, "hub.verify_token": verifyToken } = req.query
@@ -21,6 +23,17 @@ app.post("/", async function (req, res) {
   try {
     const body = req.body
     console.log("Request body:", JSON.stringify(body))
+
+    const id = body.entry[0]?.id
+    if (id) {
+      if (seenMessages.has(id)) {
+        console.log("Message already received:", id)
+        res.sendStatus(200) // Return 200 OK for successful processing
+        return
+      } else {
+        seenMessages.add(id)
+      }
+    }
 
     const messages = extractTextMessagesFromBody(body)
 
