@@ -24,19 +24,7 @@ app.post("/", async function (req, res) {
     const body = req.body
     console.log("Request body:", JSON.stringify(body))
 
-    const id = body.entry[0]?.id
-    if (id) {
-      if (seenMessages.has(id)) {
-        console.log("Message already received:", id)
-        res.sendStatus(200) // Return 200 OK for successful processing
-        return
-      } else {
-        seenMessages.add(id)
-      }
-    }
-
     const messages = extractTextMessagesFromBody(body)
-
     for (const message of messages) {
       const text = message.text.body
       const sender = message.from
@@ -118,7 +106,15 @@ function extractTextMessagesFromBody(payload) {
 
   messagesArray.forEach((message) => {
     if (message.type === "text") {
-      textMessages.push(message)
+      const id = message.id
+      if (seenMessages.has(id)) {
+        console.log("Message already received:", id)
+        return
+      } else {
+        textMessages.push(message)
+        seenMessages.add(id)
+      }
+
       console.log("Processing message:", JSON.stringify(message))
     } else {
       console.log("Skipping message:", message)
